@@ -1,0 +1,8 @@
+prefix=/home/hik/Masaüstü/ros/hik_drone_train_ws/devel
+
+Name: drone_missions
+Description: Description of drone_missions
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

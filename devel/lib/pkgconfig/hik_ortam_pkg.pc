@@ -1,0 +1,8 @@
+prefix=/home/hik/Masaüstü/ros/hik_drone_train_ws/devel
+
+Name: hik_ortam_pkg
+Description: Description of hik_ortam_pkg
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

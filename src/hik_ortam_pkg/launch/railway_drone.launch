@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+
+<launch>
+  <!-- Parametreler -->
+  <arg name="x_pos" default="6.81782"/>
+  <arg name="y_pos" default="-4.882797"/>
+  <arg name="z_pos" default="0.5"/>
+  <arg name="roll" default="0.0"/>
+  <arg name="pitch" default="0.0"/>
+  <arg name="yaw" default="0.0"/>
+
+  <!-- Gazebo'yu başlat -->
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="world_name" value="$(find hik_ortam_pkg)/worlds/railway.world"/>
+    <arg name="paused" value="false"/>
+    <arg name="gui" value="true"/>
+    <arg name="headless" value="false"/>
+    <arg name="debug" value="false"/>
+  </include>
+
+  <!-- Hector Quadrotor kontrol sistemini başlat -->
+  <include file="$(find hector_quadrotor_gazebo)/launch/spawn_quadrotor.launch">
+    <!-- Alttaki satır kamerayı eklyior hectora , başka sensörlerde ekler bakarsın. -->
+    <arg name="model" value="$(find hector_quadrotor_description)/urdf/quadrotor_hokuyo_utm30lx.gazebo.xacro"/> 
+
+
+    
+    <!-- Pozisyon argümanlarını ilet -->
+    <arg name="x" value="$(arg x_pos)"/>
+    <arg name="y" value="$(arg y_pos)"/>
+    <arg name="z" value="$(arg z_pos)"/>
+  </include>
+  
+
+  
+  
+  <!-- Start rviz visualization with preset config -->
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find hector_quadrotor_demo)/rviz_cfg/outdoor_flight.rviz"/>
+   
+</launch>
+

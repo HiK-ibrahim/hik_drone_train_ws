@@ -1,0 +1,8 @@
+prefix=/home/hik/Masaüstü/ros/hik_drone_train_ws/devel
+
+Name: unique_id
+Description: Description of unique_id
+Version: 1.0.6
+Cflags: -I/home/hik/Masaüstü/ros/hik_drone_train_ws/src/hector_quadrotor_noetic/unique_identifier/unique_id/include -I/usr/include
+Libs: -L${prefix}/lib 
+Requires: uuid_msgs
