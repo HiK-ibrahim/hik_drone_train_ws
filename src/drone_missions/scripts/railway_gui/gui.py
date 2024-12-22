@@ -1,28 +1,28 @@
 import sys
 import rospy
 import cv2
-import numpy as np
 from PySide6.QtWidgets import QApplication, QLabel, QVBoxLayout, QHBoxLayout, QWidget, QPushButton, QGridLayout
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtCore import QTimer, Qt
 from sensor_msgs.msg import Image, LaserScan
 from cv_bridge import CvBridge
-from line_detect import LineDetector
 from füzyon_matrixVeRenkli_Modüler import process_fusion
 from drone_control import DroneControl
+# Ray detection modülünü import ediyoruz
+from ray_and_distance_detect import detect_rails_and_measure
 
 class FusionGUI(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Füzyon ve Çizgi Takibi Arayüzü")
-        self.setGeometry(100, 100, 1600, 600)
+        self.setWindowTitle("Füzyon Arayüzü")
+        self.setGeometry(100, 100, 1600, 800)
 
         # QLabel'ler
         self.fusion_label = QLabel("Füzyon görüntüsü bekleniyor...")
         self.fusion_label.setAlignment(Qt.AlignCenter)
 
-        self.downward_camera_label = QLabel("Çizgi tespiti bekleniyor...")
-        self.downward_camera_label.setAlignment(Qt.AlignCenter)
+        self.rail_detection_label = QLabel("Ray tespit görüntüsü bekleniyor...")
+        self.rail_detection_label.setAlignment(Qt.AlignCenter)
 
         self.status_label = QLabel("Durum: Bekleniyor...")
         self.status_label.setAlignment(Qt.AlignCenter)
@@ -34,18 +34,14 @@ class FusionGUI(QWidget):
         self.bridge = CvBridge()
         self.last_lidar_msg = None
         self.last_front_camera_msg = None
-        self.last_downward_camera_msg = None
+        self.last_lidar_msg_downward = None
+        self.last_downward_camera_frame = None
 
+        # ROS Subscribers
         rospy.Subscriber("/scan", LaserScan, self.lidar_callback)
         rospy.Subscriber("/front_cam/camera/image", Image, self.front_camera_callback)
+        rospy.Subscriber("/scan/downward", LaserScan, self.downward_lidar_callback)
         rospy.Subscriber("/downward_cam/downward_camera/image", Image, self.downward_camera_callback)
-
-        # LineDetector parametreleri
-        lower_red1 = np.array([0, 100, 100])
-        upper_red1 = np.array([10, 255, 255])
-        lower_red2 = np.array([160, 100, 100])
-        upper_red2 = np.array([179, 255, 255])
-        self.line_detector = LineDetector(lower_red1, upper_red1, lower_red2, upper_red2)
 
         # Görüntü güncelleme için QTimer
         self.timer = QTimer()
@@ -53,9 +49,9 @@ class FusionGUI(QWidget):
         self.timer.start(100)  # 100 ms
 
         # Layout ayarı
-        layout = QHBoxLayout()
-        layout.addWidget(self.fusion_label)
-        layout.addWidget(self.downward_camera_label)
+        image_layout = QHBoxLayout()
+        image_layout.addWidget(self.fusion_label)
+        image_layout.addWidget(self.rail_detection_label)
 
         # Kontrol butonları için QGridLayout
         grid_layout = QGridLayout()
@@ -73,7 +69,7 @@ class FusionGUI(QWidget):
 
         # Ana layout
         main_layout = QVBoxLayout()
-        main_layout.addLayout(layout)
+        main_layout.addLayout(image_layout)
         main_layout.addWidget(self.status_label)
         main_layout.addLayout(grid_layout)
         self.setLayout(main_layout)
@@ -84,14 +80,22 @@ class FusionGUI(QWidget):
     def front_camera_callback(self, msg):
         self.last_front_camera_msg = msg
 
+    def downward_lidar_callback(self, msg):
+        self.last_lidar_msg_downward = msg
+
     def downward_camera_callback(self, msg):
-        self.last_downward_camera_msg = msg
+        try:
+            frame = self.bridge.imgmsg_to_cv2(msg, "bgr8")
+            self.last_downward_camera_frame = frame
+        except Exception as e:
+            rospy.logerr(f"Kamera mesajı işlenirken hata oluştu: {e}")
 
     def update_views(self):
         if self.last_lidar_msg and self.last_front_camera_msg:
             self.update_fusion_view()
-        if self.last_downward_camera_msg:
-            self.update_downward_view()
+
+        if self.last_lidar_msg_downward and self.last_downward_camera_frame is not None:
+            self.update_rail_detection_view()
 
     def update_fusion_view(self):
         lidar_mask = process_fusion(self.last_lidar_msg, None)
@@ -99,28 +103,18 @@ class FusionGUI(QWidget):
         combined_image = self.overlay_lidar_on_camera(lidar_mask, front_camera)
         self.update_label_with_image(self.fusion_label, combined_image)
 
-    def update_downward_view(self):
-        cv_image = self.bridge.imgmsg_to_cv2(self.last_downward_camera_msg, "bgr8")
-        _, processed_frame = self.line_detector.detect_red_lines(cv_image)
-        self.update_label_with_image(self.downward_camera_label, processed_frame)
-
+    def update_rail_detection_view(self):
+        # Ray detection fonksiyonunu çağır ve görüntüyü al
+        processed_image = detect_rails_and_measure(self.last_lidar_msg_downward, self.last_downward_camera_frame)
+        if processed_image is not None:
+            self.update_label_with_image(self.rail_detection_label, processed_image)
 
     def overlay_lidar_on_camera(self, lidar_mask, camera_image):
-        """
-        Lidar maskesini ön kamera görüntüsüne şeffaf bir katman olarak ekler.
-        """
-        # Eğer lidar maskesi tek kanallıysa (grayscale), BGR formatına çevir
         if len(lidar_mask.shape) == 2:
             lidar_mask = cv2.cvtColor(lidar_mask, cv2.COLOR_GRAY2BGR)
-
-        # Boyutları eşitle
         camera_image = cv2.resize(camera_image, (lidar_mask.shape[1], lidar_mask.shape[0]))
-
-        # Şeffaflık ayarı
-        alpha = 0.5  # Lidar maskesi için şeffaflık değeri
+        alpha = 0.5
         beta = 1 - alpha
-
-        # Görüntüleri birleştir
         fused_image = cv2.addWeighted(camera_image, beta, lidar_mask, alpha, 0)
         return fused_image
 
@@ -136,7 +130,6 @@ class FusionGUI(QWidget):
 
 if __name__ == "__main__":
     rospy.init_node("fusion_gui", anonymous=True)
-
     app = QApplication(sys.argv)
     gui = FusionGUI()
     gui.show()

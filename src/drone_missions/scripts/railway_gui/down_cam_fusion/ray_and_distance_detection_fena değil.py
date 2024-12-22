@@ -7,12 +7,13 @@ from tf.transformations import quaternion_matrix
 
 # Global değişkenler
 bridge = CvBridge()
+last_lidar_msg_downward = None
 last_camera_frame = None
 
 # Kamera parametreleri
 res_x = 640
 res_y = 480
-hfov_deg = 90  # Kameranın FOV'u sabit
+hfov_deg = 90
 hfov_rad = np.deg2rad(hfov_deg)
 f_x = res_x / (2 * np.tan(hfov_rad / 2))
 f_y = f_x
@@ -35,31 +36,30 @@ def get_transform_matrix():
     transform_matrix[0:3, 0:3] = rot_matrix[0:3, 0:3]
     return transform_matrix
 
-def visualize_height_differences(scan):
-    global last_camera_frame
+def detect_rails_and_measure(scan):
     if last_camera_frame is None:
         rospy.logwarn("Kamera görüntüsü bekleniyor...")
         return
 
-    # Görüntü üzerinde doğrudan çizim yapılması
+    # Kamera görüntüsünü lidar katmanı için temel olarak kullan
     lidar_layer = last_camera_frame.copy()
+
+    # Kameranın FOV'üne göre lidar verilerini sınırlıyoruz
+    half_fov = hfov_rad / 2  # Kameranın sağ ve sol görüş açısının yarısı
 
     transform_matrix = get_transform_matrix()
     angle_min = scan.angle_min
     angle_increment = scan.angle_increment
-    points_in_fov = []
+    rail_points = []
 
-    # Lidar'ın görüş açısını yarıya indiriyoruz (kameranın merkezi odaklı)
-    lidar_half_fov = hfov_rad / 2
-    lidar_center_angle = (scan.angle_min + scan.angle_max) / 2
-    lidar_min_angle = lidar_center_angle - lidar_half_fov
-    lidar_max_angle = lidar_center_angle + lidar_half_fov
-
-    # Lidar verilerinin işlenmesi
-    for i, r in enumerate(scan.ranges):
+    # Her 3. LIDAR noktasını işliyoruz
+    for i in range(0, len(scan.ranges), 2):
+        r = scan.ranges[i]
         if scan.range_min < r < scan.range_max:
             angle = angle_min + i * angle_increment
-            if lidar_min_angle <= angle <= lidar_max_angle:
+
+            # Lidar verisinin açısı kameranın FOV'ü içinde mi?
+            if -half_fov <= angle <= half_fov:
                 x = r * np.cos(angle)
                 y = r * np.sin(angle)
                 z = 0.0
@@ -70,25 +70,40 @@ def visualize_height_differences(scan):
                     pixel = camera_matrix @ np.array([x, y, z])
                     pixel = (pixel / pixel[2]).astype(int)
                     if 0 <= pixel[0] < res_x and 0 <= pixel[1] < res_y:
-                        points_in_fov.append((x, y, z, pixel))
+                        rail_points.append((x, y, z))
+                        # Ray noktalarını kırmızı ile işaretle
+                        cv2.circle(lidar_layer, (pixel[0], pixel[1]), 3, (0, 0, 255), -1)
 
-    if points_in_fov:
-        z_values = [point[2] for point in points_in_fov]
-        z_min = min(z_values)
-        z_max = max(z_values)
-        z_range = max(z_max - z_min, 1e-6)  # Bölme hatasını önlemek için küçük bir epsilon
+    # Ray tespiti ve yükseklik analizi
+    if rail_points:
+        rail_z_values = [point[2] for point in rail_points]
+        ground_level = np.percentile(rail_z_values, 1)  # Zemin seviyesi için alt %10
+        rail_heights = [z - ground_level for z in rail_z_values]
+        avg_height = np.mean(rail_heights)
 
-        for x, y, z, pixel in points_in_fov:
-            normalized_z = (z - z_min) / z_range
-            color = (0, int(255 * (1 - normalized_z)), int(255 * normalized_z))
-            cv2.circle(lidar_layer, (pixel[0], pixel[1]), 2, color, -1)
+        # Zemin referansı noktalarını mavi ile işaretle
+        for point in rail_points:
+            if abs(point[2] - ground_level) < 0.05:  # Zemine yakın noktaları seç
+                ground_pixel = camera_matrix @ np.array([point[0], point[1], point[2]])
+                ground_pixel = (ground_pixel / ground_pixel[2]).astype(int)
+                if 0 <= ground_pixel[0] < res_x and 0 <= ground_pixel[1] < res_y:
+                    cv2.circle(lidar_layer, (ground_pixel[0], ground_pixel[1]), 5, (255, 0, 0), -1)
 
-    # Görüntüyü ekranda göster
-    cv2.imshow("Height Differences Visualization", lidar_layer)
+        # Yükseklik bilgisini ekrana yazdır
+        rospy.loginfo(f"Ray zeminden ortalama yükseklik: {avg_height:.2f} metre")
+        cv2.putText(lidar_layer, f"Avg Height: {avg_height:.2f} m", (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+
+    # Görselleştirme penceresi
+    cv2.imshow("Ray Detection and Height Visualization", lidar_layer)
     cv2.waitKey(1)
 
+
+
 def lidar_callback(scan):
-    visualize_height_differences(scan)
+    global last_lidar_msg_downward
+    last_lidar_msg_downward = scan
+    detect_rails_and_measure(scan)
 
 def camera_callback(msg):
     global last_camera_frame
@@ -99,7 +114,7 @@ def camera_callback(msg):
         rospy.logerr(f"Kamera mesajı işlenirken hata oluştu: {e}")
 
 if __name__ == "__main__":
-    rospy.init_node("height_differences_visualization")
+    rospy.init_node("ray_and_distance_detection")
     rospy.Subscriber("/scan/downward", LaserScan, lidar_callback)
     rospy.Subscriber("/downward_cam/downward_camera/image", Image, camera_callback)
 
