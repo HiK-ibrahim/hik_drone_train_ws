@@ -47,7 +47,7 @@ def detect_rails_and_measure(scan, camera_frame):
     """
     if camera_frame is None:
         return None
-
+z
     # Kamera görüntüsünü lidar katmanı için temel olarak kullan
     lidar_layer = camera_frame.copy()
 
