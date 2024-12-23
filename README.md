@@ -12,10 +12,10 @@ Sistem, drone'u izlemek ve kontrol etmek için bir grafiksel kullanıcı arayüz
 - **Modüler Tasarım**: Proje, bağımsız olarak güncellenip test edilebilen çeşitli modüllerle yapılandırılmıştır, bu da geliştirme sürecini kolaylaştırmaktadır.
 
 ## Görseller
-1. **Füzyon Görüntüsü**: Kamera ve LiDAR (ön) füzyonunun görselleştirildiği görüntü.
+1. **Füzyon Görüntüsü**: Kamera ve LiDAR füzyonu ve ray ile zemin arasındaki mesafenin görselleştirildiği arayüz görüntüsü.
 ![image](https://github.com/user-attachments/assets/20bd0cde-990c-44a7-a6fb-df688ba6a44e)
 
-2. **Ray ile Zemin Arasındaki Mesafe Tespiti**: LiDAR sensörü kullanılarak ray ile zemin arasındaki mesafe ölçümünün gösterildiği görüntü.
+2. **Ray ile Zemin Arasındaki Mesafe Tespiti**: Gazebo test ortamındaki ortam görüntüsü
 ![image](https://github.com/user-attachments/assets/3b12e8a1-ed3a-4992-b2c2-149cf141d247)
 
 ## Gelecek Geliştirmeler
