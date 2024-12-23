@@ -1,6 +1,6 @@
 # hik_drone_train_ws
 
-Bu proje, ROS (Robot Operating System) kullanarak bir drone'u kontrol etmeyi, sensör verilerini işlemeyi ve ray tespiti gibi görevler için birden fazla sensörü entegre etmeyi amaçlamaktadır. Projede, LiDAR ve kamera sensörlerinin birleşimiyle füzyon teknolojisi uygulanmış olup, sistemde iki adet kamera ve iki adet 2D LiDAR (ön ve aşağıya bakan) sensörü entegre edilmiştir. Aynı doğrultuda yer alan LiDAR ve kameralar arasında veri füzyonu başarıyla gerçekleştirilmiştir. 
+Bu proje, ROS (Robot Operating System) kullanarak bir drone'u kontrol etmeyi, sensör verilerini işlemeyi ve ray ve zemin arasındaki mesafe tespiti gibi görevler için birden fazla sensörü entegre etmeyi amaçlamaktadır. Projede, LiDAR ve kamera sensörlerinin birleşimiyle füzyon teknolojisi uygulanmış olup, sistemde iki adet kamera ve iki adet 2D LiDAR (ön ve aşağıya bakan) sensörü entegre edilmiştir. Aynı doğrultuda yer alan LiDAR ve kameralar arasında veri füzyonu başarıyla gerçekleştirilmiştir. 
 
 Sistem, drone'u izlemek ve kontrol etmek için bir grafiksel kullanıcı arayüzü (GUI) içermektedir. Arayüzde, birinci görüntüde kamera ve LiDAR füzyonu, ikinci görüntüde ise ray ile zemin arasındaki mesafe ölçümü LiDAR sensörü ile yapılmakta ve görselleştirilmektedir.
 
